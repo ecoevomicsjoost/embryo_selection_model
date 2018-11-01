@@ -1,0 +1,89 @@
+### take values from the c++ program and calculate per tfbs and locus teh mean and variance
+### then in this (standard) case for selection all gene expression above (for up) and below (for down) are taken for selection
+
+### then these number of loci are subsampled to get equal numbers and a model is fitted to get the amount of the variance corrected for the mean for controls and cases
+### Joost van den Heuvel, joost.vandenheuvel@wur.nl
+
+dat<-read.table("methylation.txt",header=F)
+
+dim(dat)
+head(dat)
+
+dat$V8 ##### gene expression
+dat$V7 #### mean methylation freq per ind per loc
+dat$V6 #### locus
+dat$V5 ### individual
+dat$V3 ## TF
+
+
+for (i in 0:75)
+{
+datTF<-dat[which(dat$V3==i),]
+M<-mean(datTF$V8)
+datlow<-datTF[which(datTF$V8<M),]
+dathigh<-datTF[which(datTF$V8>M),]
+
+write.table(datTF, file="methylation not selected.txt",
+sep='\t', col.names=F, row.names=F,append=TRUE)
+
+write.table(datlow, file="methylation low selected.txt",
+sep='\t', col.names=F, row.names=F,append=TRUE)
+
+write.table(dathigh, file="methylation high selected.txt",
+sep='\t', col.names=F, row.names=F,append=TRUE)
+}
+
+
+
+dat<-read.table("methylation not selected.txt", header=F)
+
+ 
+S<-sample(c(1:dim(dat)[[1]]),10000)
+datS<-dat[S,]
+newvar<-datS$V3*10+datS$V6
+dat_mean_nos<-tapply(datS$V7,newvar,mean)
+dat_std_nos<-sqrt(tapply(datS$V7,newvar,var))
+datout<-cbind(dat_mean_nos,dat_std_nos)
+datout<-na.omit(datout)
+datout_cont<-datout
+
+
+N_points_con<-dim(datout)[[1]]
+
+dat<-read.table("methylation low selected.txt", header=F)
+L<-dim(dat)[[1]]
+S<-sample(c(1:L),10000)
+dattie<-dat[S,]
+newvar<-datS$V3*10+datS$V6
+dat_mean_nos<-tapply(datS$V7,newvar,mean)
+dat_std_nos<-sqrt(tapply(datS$V7,newvar,var))
+datout<-cbind(dat_mean_nos,dat_std_nos)
+datout<-na.omit(datout)
+
+
+dat<-read.table("methylation high selected.txt", header=F)
+L<-dim(dat)[[1]]
+S<-sample(c(1:L),10000)
+datS<-dat[S,]
+newvar<-datS$V3*10+datS$V6
+dat_mean_nos<-tapply(datS$V7,newvar,mean)
+dat_std_nos<-sqrt(tapply(datS$V7,newvar,var))
+datout<-rbind(datout,cbind(dat_mean_nos,dat_std_nos))
+datout<-na.omit(datout)
+
+S<-sample(c(1:dim(datout)[[1]]),N_points_con)
+
+datout_case<-datout[S,]
+
+Y<-datout_cont[,2]
+X<-datout_cont[,1]
+
+M<-lm(Y~X+I(X^2))
+summary(M) ## extract the control values
+
+Y<-datout_case[,2]
+X<-datout_case[,1]
+
+M<-lm(Y~X+I(X^2))
+summary(M) ### extract the case values
+
